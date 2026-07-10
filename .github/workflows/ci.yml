@@ -1,0 +1,30 @@
+name: Legacy source validation
+
+on:
+  push:
+    branches: [8.x]
+  pull_request:
+    branches: [8.x]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-preserved-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          tools: composer:v2
+          coverage: none
+      - name: Validate Composer metadata without installing obsolete packages
+        run: composer validate --no-check-publish --no-interaction
+      - name: Validate checked-in PHP syntax
+        run: find . -path './vendor' -prune -o -name '*.php' -print0 | xargs -0 -r -n1 php -l
+      - name: Verify explicit legacy boundary
+        run: |
+          test -f LEGACY.md
+          grep -q 'Drupal 8 is end-of-life' LEGACY.md
+          php -r '$p=json_decode(file_get_contents("composer.json"), true, 512, JSON_THROW_ON_ERROR); if (($p["require"]["drupal/core"] ?? null) !== "^8.6.0") exit(1);'
